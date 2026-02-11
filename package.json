@@ -1,0 +1,20 @@
+{
+  "name": "foro-uber-ciberseguridad",
+  "version": "1.0.0",
+  "description": "Foro de debate interactivo con IA - Caso Uber - Diplomado en Ciberseguridad",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'No build step required'",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "author": "Anáhuac Online",
+  "license": "MIT"
+}

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foro IA: Doble Hackeo de Uber | Anáhuac Online</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --orange: #FF5900;
+      --orange-light: #FF7A33;
+      --orange-dark: #CC4700;
+      --rich-black: #040404;
+      --raisin-black: #262626;
+      --spanish-gray: #9C9C9C;
+    }
+    .bg-anahuac { background-color: var(--orange); }
+    .bg-anahuac-dark { background-color: var(--orange-dark); }
+    .text-anahuac { color: var(--orange); }
+    .border-anahuac { border-color: var(--orange); }
+    .hover-anahuac:hover { background-color: var(--orange-dark); }
+    .animate-bounce-delayed-1 { animation-delay: 150ms; }
+    .animate-bounce-delayed-2 { animation-delay: 300ms; }
+    .prose p { margin-bottom: 0.75rem; }
+    .prose strong { font-weight: 600; }
+    .prose ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 0.75rem; }
+    .prose li { margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Configuración del foro
+    const CONFIG = {
+      titulo: "Foro de Debate: Analizando el Doble Hackeo de Uber",
+      objetivo: "Identificar vulnerabilidades y estrategias de respuesta a incidentes cibernéticos, reflexionando sobre el factor humano en la seguridad digital y la transparencia.",
+      caso: `El caso Uber es un ejemplo emblemático de cómo la ciberseguridad puede fallar tanto por negligencia corporativa como por el factor humano.
+
+**Primer hackeo (2016):**
+El primer incidente ocurrió en 2016, cuando atacantes robaron datos de 57 millones de usuarios y conductores tras acceder a un repositorio privado de código. Sin embargo, el escándalo estalló realmente un año después, al revelarse que la empresa ocultó la brecha y pagó 100,000 dólares a los hackers bajo la apariencia de una "recompensa por errores" (bug bounty) para que borraran la información y guardaran silencio, lo que derivó en graves sanciones legales y la condena de su entonces jefe de seguridad.
+
+**Segundo hackeo (2022):**
+Seis años después, en 2022, Uber volvió a ser víctima de un ataque masivo, esta vez mediante ingeniería social. Un joven de 18 años logró engañar a un empleado a través de un "ataque de fatiga MFA", bombardeándolo con notificaciones de autenticación hasta que este aceptó una por error o cansancio. Una vez dentro de la red interna, el atacante encontró credenciales de administrador expuestas en scripts internos, lo que le permitió tomar el control de herramientas críticas como Slack, Amazon Web Services y Google Workspace.
+
+Este doble hackeo subraya que incluso las mayores tecnológicas son vulnerables si descuidan la gestión de accesos y la formación de sus empleados.`,
+      preguntas: [
+        "¿Cuáles fueron las principales fallas de seguridad en cada incidente?",
+        "¿Qué papel jugó el factor humano en la segunda brecha?",
+        "¿Cómo impacta la gestión o encubrimiento de incidentes en la confianza de usuarios y reguladores?",
+        "Desde una perspectiva de gobernanza, ¿qué consecuencias tiene 'maquillar' un riesgo frente a comunicarlo de forma transparente, aunque resulte incómodo?"
+      ]
+    };
+
+    // Función para formatear mensajes con markdown básico
+    function formatMessage(text) {
+      if (!text) return null;
+      
+      const lines = text.split('\n');
+      const elements = [];
+      let currentList = [];
+      let inList = false;
+
+      lines.forEach((line, idx) => {
+        // Títulos
+        if (line.startsWith('### ')) {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+            inList = false;
+          }
+          elements.push(<h3 key={idx} className="font-bold text-lg mt-4 mb-2">{line.replace('### ', '')}</h3>);
+        } else if (line.startsWith('## ')) {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+            inList = false;
+          }
+          elements.push(<h2 key={idx} className="font-bold text-xl mt-4 mb-2">{line.replace('## ', '')}</h2>);
+        } else if (line.startsWith('# ')) {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+            inList = false;
+          }
+          elements.push(<h1 key={idx} className="font-bold text-2xl mt-4 mb-2">{line.replace('# ', '')}</h1>);
+        }
+        // Listas
+        else if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+          inList = true;
+          const content = line.trim().replace(/^[-*]\s/, '');
+          currentList.push(<li key={`li-${idx}`}>{formatInlineText(content)}</li>);
+        }
+        // Listas numeradas
+        else if (/^\d+\.\s/.test(line.trim())) {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+          }
+          inList = true;
+          const content = line.trim().replace(/^\d+\.\s/, '');
+          currentList.push(<li key={`li-${idx}`}>{formatInlineText(content)}</li>);
+        }
+        // Párrafos normales
+        else if (line.trim()) {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+            inList = false;
+          }
+          elements.push(<p key={idx} className="mb-3">{formatInlineText(line)}</p>);
+        }
+        // Líneas vacías
+        else {
+          if (inList && currentList.length > 0) {
+            elements.push(<ul key={`list-${idx}`} className="list-disc ml-6 mb-3">{currentList}</ul>);
+            currentList = [];
+            inList = false;
+          }
+        }
+      });
+
+      if (currentList.length > 0) {
+        elements.push(<ul key="final-list" className="list-disc ml-6 mb-3">{currentList}</ul>);
+      }
+
+      return <div className="prose">{elements}</div>;
+    }
+
+    function formatInlineText(text) {
+      // Negritas **texto**
+      const parts = text.split(/(\*\*[^*]+\*\*)/g);
+      return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+    }
+
+    // Componente de registro
+    function RegistroScreen({ onRegister }) {
+      const [nombre, setNombre] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (nombre.trim()) {
+          onRegister(nombre.trim());
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-anahuac rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">Foro de Ciberseguridad</h1>
+              <p className="text-gray-600 text-sm">Diplomado en Ciberseguridad • Anáhuac Online</p>
+            </div>
+
+            <div className="bg-orange-50 border-l-4 border-anahuac p-4 rounded-r-lg mb-6">
+              <h3 className="font-semibold text-gray-800 mb-1">📋 Tema del foro:</h3>
+              <p className="text-sm text-gray-700">Analizando el Doble Hackeo de Uber</p>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tu nombre completo
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Ej: María García López"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 mb-6"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full bg-anahuac text-white py-3 rounded-lg font-semibold hover-anahuac transition-colors"
+              >
+                Comenzar participación
+              </button>
+            </form>
+
+            <p className="text-xs text-gray-500 text-center mt-6">
+              Al participar, aceptas que tus respuestas serán evaluadas formativamente.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // Componente principal del foro
+    function ForoScreen({ studentName }) {
+      const [messages, setMessages] = useState([]);
+      const [input, setInput] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+      const [phase, setPhase] = useState('intro');
+      const [interactionCount, setInteractionCount] = useState(0);
+      const [showQuestions, setShowQuestions] = useState(false);
+      const [showCase, setShowCase] = useState(false);
+      const [error, setError] = useState(null);
+      const messagesEndRef = useRef(null);
+
+      const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      };
+
+      useEffect(() => {
+        scrollToBottom();
+      }, [messages]);
+
+      const handleSubmit = async () => {
+        if (!input.trim() || isLoading) return;
+
+        const userMessage = input.trim();
+        setInput('');
+        setError(null);
+        
+        const newMessages = [...messages, { role: 'user', content: userMessage }];
+        setMessages(newMessages);
+        setIsLoading(true);
+
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: newMessages,
+              phase: phase,
+              studentName: studentName
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error en el servidor');
+          }
+
+          const data = await response.json();
+          
+          const newCount = interactionCount + 1;
+          setInteractionCount(newCount);
+
+          if (newCount >= 3) {
+            setPhase('evaluation');
+          } else if (newCount >= 1) {
+            setPhase('replies');
+          }
+
+          setMessages([...newMessages, { 
+            role: phase === 'evaluation' ? 'evaluation' : 'assistant', 
+            content: data.response 
+          }]);
+
+        } catch (err) {
+          console.error('Error:', err);
+          setError(err.message);
+          setMessages(newMessages);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const requestEvaluation = async () => {
+        if (isLoading || interactionCount < 1) return;
+
+        setIsLoading(true);
+        setError(null);
+        setPhase('evaluation');
+
+        try {
+          const evaluationRequest = "Por favor, evalúa mi participación completa en el foro según la rúbrica establecida.";
+          const newMessages = [...messages, { role: 'user', content: evaluationRequest }];
+
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: newMessages,
+              phase: 'evaluation',
+              studentName: studentName
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Error en el servidor');
+          }
+
+          const data = await response.json();
+          setMessages([...newMessages, { role: 'evaluation', content: data.response }]);
+
+        } catch (err) {
+          console.error('Error:', err);
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-100">
+          {/* Header */}
+          <header className="bg-anahuac text-white py-4 px-6 shadow-lg">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-xl font-bold">Foro de Debate con IA</h1>
+                  <p className="text-orange-100 text-sm">Diplomado en Ciberseguridad • Anáhuac Online</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-orange-100">Participante:</p>
+                  <p className="font-semibold">{studentName}</p>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-4xl mx-auto p-4">
+            {/* Panel de información */}
+            <div className="bg-white rounded-xl shadow-md mb-4 overflow-hidden">
+              <div className="bg-gray-800 text-white px-6 py-4">
+                <h2 className="text-lg font-bold">{CONFIG.titulo}</h2>
+                <p className="text-gray-300 text-sm mt-1">{CONFIG.objetivo}</p>
+              </div>
+              
+              {/* Botones para mostrar caso y preguntas */}
+              <div className="p-4 border-b flex gap-3 flex-wrap">
+                <button
+                  onClick={() => setShowCase(!showCase)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {showCase ? 'Ocultar caso' : 'Ver caso de estudio'}
+                </button>
+                <button
+                  onClick={() => setShowQuestions(!showQuestions)}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-anahuac rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {showQuestions ? 'Ocultar preguntas' : 'Ver preguntas guía'}
+                </button>
+              </div>
+
+              {/* Caso de estudio */}
+              {showCase && (
+                <div className="p-6 bg-gray-50 border-b">
+                  <h3 className="font-bold text-gray-800 mb-3">📖 Caso de Estudio: El Doble Hackeo de Uber</h3>
+                  <div className="text-sm text-gray-700 space-y-3">
+                    {formatMessage(CONFIG.caso)}
+                  </div>
+                </div>
+              )}
+
+              {/* Preguntas guía */}
+              {showQuestions && (
+                <div className="p-6 bg-orange-50 border-b">
+                  <h3 className="font-bold text-gray-800 mb-3">❓ Preguntas de Discusión</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                    {CONFIG.preguntas.map((q, i) => (
+                      <li key={i} className="pl-2">{q}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+
+            {/* Área de mensajes */}
+            <div className="bg-white rounded-xl shadow-md">
+              <div className="h-96 overflow-y-auto p-4 space-y-4">
+                {messages.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <p className="font-medium">¡Bienvenido al foro, {studentName}!</p>
+                    <p className="text-sm mt-2">Lee el caso de estudio y escribe tu primera intervención analizando el doble hackeo de Uber.</p>
+                  </div>
+                )}
+
+                {messages.map((message, idx) => (
+                  <div key={idx} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                      message.role === 'user' 
+                        ? 'bg-anahuac text-white' 
+                        : message.role === 'evaluation'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {message.role === 'user' && (
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/30 text-xs opacity-75">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Tu intervención
+                        </div>
+                      )}
+                      {message.role === 'assistant' && (
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-300 text-xs text-gray-500">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Réplicas de compañeros
+                        </div>
+                      )}
+                      {message.role === 'evaluation' && (
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/30">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-bold">Evaluación Formativa</span>
+                        </div>
+                      )}
+                      <div className="text-sm">
+                        {message.role === 'user' ? message.content : formatMessage(message.content)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-anahuac rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-anahuac rounded-full animate-bounce animate-bounce-delayed-1"></div>
+                          <div className="w-2 h-2 bg-anahuac rounded-full animate-bounce animate-bounce-delayed-2"></div>
+                        </div>
+                        <span className="text-sm">Generando respuestas...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    <strong>Error:</strong> {error}
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Input área */}
+              <div className="p-4 border-t">
+                {phase !== 'evaluation' || interactionCount < 3 ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder={phase === 'intro' 
+                        ? "Escribe tu análisis del caso Uber. Considera las fallas de seguridad, el factor humano y las consecuencias del encubrimiento..." 
+                        : "Escribe tu réplica a los argumentos de tus compañeros..."}
+                      className="w-full p-3 border border-gray-300 rounded-xl resize-none text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      rows={4}
+                      disabled={isLoading}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.ctrlKey) {
+                          handleSubmit();
+                        }
+                      }}
+                    />
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-500 flex items-center gap-4">
+                        {interactionCount > 0 && (
+                          <>
+                            <span>Intervenciones: {interactionCount}/3</span>
+                            {interactionCount >= 1 && phase !== 'evaluation' && (
+                              <button
+                                onClick={requestEvaluation}
+                                className="text-emerald-600 hover:text-emerald-700 font-medium"
+                                disabled={isLoading}
+                              >
+                                Solicitar evaluación
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleSubmit}
+                        disabled={!input.trim() || isLoading}
+                        className="bg-anahuac text-white px-6 py-2 rounded-lg font-medium hover-anahuac transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <span>Enviar</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">Ctrl + Enter para enviar</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-emerald-600 font-medium">✓ Has completado tu participación en el foro</p>
+                    <p className="text-sm text-gray-500 mt-1">Revisa tu evaluación formativa arriba</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <footer className="text-center py-6 text-sm text-gray-500">
+              <p>Foro de Debate Interactivo con IA • Módulo 2, Unidad 4</p>
+              <p className="mt-1">Anáhuac Online • Diplomado en Ciberseguridad • 2025</p>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    // App principal
+    function App() {
+      const [studentName, setStudentName] = useState(null);
+
+      if (!studentName) {
+        return <RegistroScreen onRegister={setStudentName} />;
+      }
+
+      return <ForoScreen studentName={studentName} />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

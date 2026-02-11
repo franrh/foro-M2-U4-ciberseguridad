@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["nodejs_18"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[start]
+cmd = "node server.js"
+```
+
+---
+
+## 📄 Archivo 4: `.gitignore`
+```
+node_modules/
+.env
+.DS_Store
